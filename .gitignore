@@ -1,0 +1,23 @@
+# Data (too large for GitHub — use scripts/download_data.py)
+data/*
+!data/.gitkeep
+
+# Local-only documents
+*.docx
+*.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+*.h5
+*.parquetbundle
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
