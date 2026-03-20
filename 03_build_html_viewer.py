@@ -165,45 +165,61 @@ def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_pat
 <title>VenomsBase Explorer</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
+:root {{
+  --bg: #0a0a0a; --bg2: #111; --bg3: #1a1a2e; --bg4: #0d0d1a;
+  --fg: #e0e0e0; --fg2: #aaa; --fg3: #888; --fg4: #555;
+  --border: #333; --accent: #7c9eff; --input-bg: #2a2a3e;
+  --gene: #3a5a8a; --gene-stroke: #5a7aaa; --gene-hl: #F38400;
+  --seq-color: #6a9; --cat-border: #222;
+}}
+body.light {{
+  --bg: #f5f5f5; --bg2: #fff; --bg3: #e8eaf0; --bg4: #eef0f8;
+  --fg: #222; --fg2: #555; --fg3: #777; --fg4: #aaa;
+  --border: #ccc; --accent: #3355aa; --input-bg: #fff;
+  --gene: #6b8ec0; --gene-stroke: #4a6e9a; --gene-hl: #d06000;
+  --seq-color: #2a7a55; --cat-border: #ddd;
+}}
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a0a; color: #e0e0e0; height: 100vh; overflow: hidden; }}
-#app {{ display: grid; grid-template-columns: 1fr 380px; grid-template-rows: 48px 1fr 240px; height: 100vh; }}
-#toolbar {{ grid-column: 1 / -1; background: #1a1a2e; padding: 8px 16px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #333; }}
-#toolbar h1 {{ font-size: 16px; color: #7c9eff; font-weight: 600; }}
-#toolbar select, #toolbar input {{ background: #2a2a3e; border: 1px solid #444; color: #e0e0e0; padding: 4px 8px; border-radius: 4px; font-size: 13px; }}
-#toolbar input {{ width: 200px; }}
-#scatter {{ background: #0a0a0a; }}
-#panel {{ background: #111; border-left: 1px solid #333; overflow-y: auto; padding: 12px; }}
-#panel h2 {{ font-size: 14px; color: #7c9eff; margin-bottom: 8px; }}
-#panel .tag {{ margin-bottom: 4px; font-size: 12px; }}
-#panel .tag-key {{ color: #888; }}
-#panel .tag-val {{ color: #e0e0e0; word-break: break-all; }}
-#panel .tag-seq {{ font-family: monospace; font-size: 10px; color: #6a9; max-height: 60px; overflow-y: auto; }}
-#genomic {{ grid-column: 1 / -1; background: #0d0d1a; border-top: 1px solid #333; padding: 8px; overflow-x: auto; }}
-#genomic h3 {{ font-size: 12px; color: #7c9eff; margin-bottom: 4px; }}
-#genomic-canvas {{ width: 100%; height: 190px; }}
-.no-selection {{ color: #555; font-size: 13px; padding: 20px; text-align: center; }}
-#stats {{ font-size: 12px; color: #888; }}
+body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--fg); height: 100vh; overflow: hidden; }}
+#app {{ display: grid; grid-template-columns: 1fr 360px; grid-template-rows: 44px 1fr 220px; height: 100vh; }}
+#toolbar {{ grid-column: 1 / -1; background: var(--bg3); padding: 6px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }}
+#toolbar h1 {{ font-size: 15px; color: var(--accent); font-weight: 600; white-space: nowrap; }}
+#toolbar select, #toolbar input {{ background: var(--input-bg); border: 1px solid var(--border); color: var(--fg); padding: 3px 6px; border-radius: 3px; font-size: 12px; }}
+#toolbar input {{ width: 180px; }}
+#toolbar label {{ font-size: 12px; color: var(--fg3); white-space: nowrap; }}
+#theme-btn {{ background: none; border: 1px solid var(--border); color: var(--fg3); padding: 3px 8px; border-radius: 3px; cursor: pointer; font-size: 12px; }}
+#scatter {{ background: var(--bg); }}
+#panel {{ background: var(--bg2); border-left: 1px solid var(--border); overflow-y: auto; padding: 10px; }}
+#panel h2 {{ font-size: 13px; color: var(--accent); margin-bottom: 6px; }}
+.tag {{ margin-bottom: 3px; font-size: 11px; line-height: 1.4; }}
+.tag-key {{ color: var(--fg3); }}
+.tag-val {{ color: var(--fg); word-break: break-all; }}
+.tag-seq {{ font-family: 'SF Mono', Menlo, monospace; font-size: 10px; color: var(--seq-color); max-height: 50px; overflow-y: auto; word-break: break-all; }}
+.cat-section {{ margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--cat-border); }}
+.cat-label {{ font-size: 10px; color: var(--accent); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }}
+#genomic {{ grid-column: 1 / -1; background: var(--bg4); border-top: 1px solid var(--border); padding: 8px 12px; }}
+#genomic-header {{ display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }}
+#genomic-header h3 {{ font-size: 12px; color: var(--accent); }}
+#genomic-info {{ font-size: 11px; color: var(--fg3); }}
+#genomic-canvas {{ width: 100%; height: 175px; display: block; }}
+.no-selection {{ color: var(--fg4); font-size: 12px; padding: 16px; text-align: center; }}
+#stats {{ font-size: 11px; color: var(--fg3); margin-left: auto; white-space: nowrap; }}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="toolbar">
-    <h1>VenomsBase Explorer</h1>
-    <label>Color by: <select id="colorBy"></select></label>
-    <label>Projection: <select id="projection">
-      <option value="umap">UMAP</option>
-      <option value="pca">PCA</option>
-    </select></label>
-    <input type="text" id="search" placeholder="Search protein name...">
+    <h1>VenomsBase</h1>
+    <label>Color: <select id="colorBy"></select></label>
+    <label>Proj: <select id="projection"><option value="umap">UMAP</option><option value="pca">PCA</option></select></label>
+    <input type="text" id="search" placeholder="Search...">
+    <button id="theme-btn">Light</button>
     <span id="stats"></span>
   </div>
   <div id="scatter"></div>
-  <div id="panel">
-    <div class="no-selection">Click a protein point to see its tags</div>
-  </div>
+  <div id="panel"><div class="no-selection">Click a protein to inspect</div></div>
   <div id="genomic">
-    <h3>Genomic Context</h3>
+    <div id="genomic-header"><h3>Genomic Context</h3><span id="genomic-info"></span></div>
     <canvas id="genomic-canvas"></canvas>
   </div>
 </div>
@@ -211,298 +227,267 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 const PROTEINS = {proteins_json};
 const COLOR_COLUMNS = {color_columns_json};
 const GENOMIC = {genomic_json_str};
+const PALETTE = ['#F3C300','#875692','#F38400','#A1CAF1','#BE0032','#C2B280','#848482','#008856','#E68FAC','#0067A5','#F99379','#604E97','#F6A600','#B3446C','#DCD300','#882D17','#8DB600','#654522','#E25822','#2B3D26','#F2F3F4','#555555'];
 
-// Kelly's 22 maximally distinct colors
-const PALETTE = [
-  '#F3C300','#875692','#F38400','#A1CAF1','#BE0032','#C2B280',
-  '#848482','#008856','#E68FAC','#0067A5','#F99379','#604E97',
-  '#F6A600','#B3446C','#DCD300','#882D17','#8DB600','#654522',
-  '#E25822','#2B3D26','#F2F3F4','#222222'
-];
+let currentColorCol = '', currentProj = 'umap', isDark = true;
+const $ = id => document.getElementById(id);
+const css = getComputedStyle(document.body);
+const getVar = v => getComputedStyle(document.body).getPropertyValue(v).trim();
 
-let currentColorCol = '';
-let currentProj = 'umap';
+// Theme toggle
+$('theme-btn').addEventListener('click', () => {{
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  $('theme-btn').textContent = isDark ? 'Light' : 'Dark';
+  renderScatter();
+  if (lastProtein) drawGenomicContext(lastProtein);
+}});
 
 // Populate color dropdown
-const colorSel = document.getElementById('colorBy');
-COLOR_COLUMNS.forEach(col => {{
-  const opt = document.createElement('option');
-  opt.value = col;
-  opt.textContent = col;
-  colorSel.appendChild(opt);
-}});
-if (COLOR_COLUMNS.length > 0) {{
-  // Default to venom.family or first available
-  const defaultCol = COLOR_COLUMNS.find(c => c === 'venom.family') || COLOR_COLUMNS[0];
-  colorSel.value = defaultCol;
-  currentColorCol = defaultCol;
-}}
+const colorSel = $('colorBy');
+COLOR_COLUMNS.forEach(col => {{ const o = document.createElement('option'); o.value = col; o.textContent = col; colorSel.appendChild(o); }});
+const defaultCol = COLOR_COLUMNS.find(c => c === 'venom.group') || COLOR_COLUMNS.find(c => c === 'venom.family') || COLOR_COLUMNS[0] || '';
+colorSel.value = defaultCol; currentColorCol = defaultCol;
 
 function getCoords(proj) {{
-  return PROTEINS.filter(p => p[proj + '_x'] !== undefined).map(p => ({{
-    x: p[proj + '_x'],
-    y: p[proj + '_y'],
-    id: p.identifier,
-    name: p.name || p.identifier,
-    protein: p
-  }}));
+  return PROTEINS.filter(p => p[proj+'_x'] !== undefined).map(p => ({{ x:p[proj+'_x'], y:p[proj+'_y'], id:p.identifier, name:p.name||p.identifier, protein:p }}));
 }}
 
 function buildTraces(colorCol, proj) {{
   const pts = getCoords(proj);
-  if (!colorCol) {{
-    return [{{
-      x: pts.map(p => p.x),
-      y: pts.map(p => p.y),
-      text: pts.map(p => p.name),
-      customdata: pts.map(p => p.protein),
-      mode: 'markers',
-      type: 'scattergl',
-      marker: {{ size: 4, color: '#7c9eff', opacity: 0.7 }},
-      hovertemplate: '%{{text}}<extra></extra>'
-    }}];
-  }}
-
-  // Group by color value
+  if (!colorCol) return [{{ x:pts.map(p=>p.x), y:pts.map(p=>p.y), text:pts.map(p=>p.name), customdata:pts.map(p=>p.protein), mode:'markers', type:'scattergl', marker:{{size:5, color:'#7c9eff', opacity:0.8}}, hovertemplate:'%{{text}}<extra></extra>' }}];
   const groups = {{}};
-  pts.forEach(p => {{
-    const val = p.protein[colorCol] || '(empty)';
-    if (!groups[val]) groups[val] = [];
-    groups[val].push(p);
-  }});
-
-  const sortedGroups = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
-  return sortedGroups.map(([val, pts], i) => ({{
-    x: pts.map(p => p.x),
-    y: pts.map(p => p.y),
-    text: pts.map(p => p.name),
-    customdata: pts.map(p => p.protein),
-    mode: 'markers',
-    type: 'scattergl',
-    name: val.substring(0, 30) + (val.length > 30 ? '...' : '') + ' (' + pts.length + ')',
-    marker: {{ size: 4, color: PALETTE[i % PALETTE.length], opacity: 0.7 }},
-    hovertemplate: '%{{text}}<extra>' + val.substring(0, 40) + '</extra>'
+  pts.forEach(p => {{ const v = p.protein[colorCol] || '(empty)'; (groups[v] = groups[v]||[]).push(p); }});
+  return Object.entries(groups).sort((a,b) => b[1].length - a[1].length).map(([val, pts], i) => ({{
+    x:pts.map(p=>p.x), y:pts.map(p=>p.y), text:pts.map(p=>p.name), customdata:pts.map(p=>p.protein),
+    mode:'markers', type:'scattergl',
+    name: (val.length>25 ? val.substring(0,25)+'..' : val) + ' ('+pts.length+')',
+    marker:{{ size:5, color:PALETTE[i%PALETTE.length], opacity:0.8 }},
+    hovertemplate:'%{{text}}<extra>'+val.substring(0,40)+'</extra>'
   }}));
 }}
 
 function renderScatter() {{
+  const bg = getVar('--bg'), fg4 = getVar('--fg4'), fg3 = getVar('--fg3');
   const traces = buildTraces(currentColorCol, currentProj);
-  const total = traces.reduce((s, t) => s + t.x.length, 0);
-  document.getElementById('stats').textContent = total + ' proteins';
-
+  $('stats').textContent = traces.reduce((s,t) => s+t.x.length, 0) + ' proteins';
   Plotly.react('scatter', traces, {{
-    paper_bgcolor: '#0a0a0a',
-    plot_bgcolor: '#0a0a0a',
-    margin: {{ t: 10, b: 30, l: 40, r: 10 }},
-    xaxis: {{ showgrid: false, zeroline: false, color: '#555' }},
-    yaxis: {{ showgrid: false, zeroline: false, color: '#555' }},
-    legend: {{ font: {{ size: 10, color: '#aaa' }}, bgcolor: 'rgba(0,0,0,0.5)', x: 1, xanchor: 'right' }},
-    dragmode: 'pan',
-    hovermode: 'closest'
-  }}, {{ responsive: true, scrollZoom: true }});
+    paper_bgcolor: bg, plot_bgcolor: bg,
+    margin: {{ t:8, b:28, l:36, r:8 }},
+    xaxis: {{ showgrid:false, zeroline:false, color:fg4 }},
+    yaxis: {{ showgrid:false, zeroline:false, color:fg4 }},
+    legend: {{ font:{{size:10, color:fg3}}, bgcolor:'rgba(0,0,0,0)', x:1, xanchor:'right', y:1 }},
+    dragmode:'pan', hovermode:'closest'
+  }}, {{ responsive:true, scrollZoom:true }});
 }}
 
+let lastProtein = null;
 function showProteinPanel(protein) {{
-  const panel = document.getElementById('panel');
-  let html = '<h2>' + (protein.name || protein.identifier) + '</h2>';
-  if (protein.description) {{
-    html += '<div style="color:#aaa;font-size:12px;margin-bottom:8px">' + protein.description + '</div>';
-  }}
-
-  // Group tags by category
-  const categories = {{}};
-  Object.entries(protein).forEach(([key, val]) => {{
-    if (!val || val === '' || key.endsWith('_x') || key.endsWith('_y')) return;
-    const cat = key.includes('.') ? key.split('.')[0] : 'core';
-    if (!categories[cat]) categories[cat] = [];
-    categories[cat].push([key, val]);
+  lastProtein = protein;
+  const panel = $('panel');
+  let h = '<h2>' + (protein.name || protein.identifier) + '</h2>';
+  if (protein.description) h += '<div style="color:var(--fg2);font-size:11px;margin-bottom:6px">' + protein.description + '</div>';
+  const cats = {{}};
+  Object.entries(protein).forEach(([k,v]) => {{
+    if (!v || v==='' || k.endsWith('_x') || k.endsWith('_y')) return;
+    const c = k.includes('.') ? k.split('.')[0] : 'core';
+    (cats[c] = cats[c]||[]).push([k,v]);
   }});
-
-  const catOrder = ['core', 'taxonomy', 'venom', 'sequence', 'structure', 'prediction', 'identity', 'source'];
-  const catLabels = {{
-    core: 'Identity', taxonomy: 'Taxonomy', venom: 'Venom', sequence: 'Sequence',
-    structure: 'Structure', prediction: 'Predictions', identity: 'Cross-references', source: 'Source'
-  }};
-
-  catOrder.forEach(cat => {{
-    if (!categories[cat]) return;
-    html += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #222">';
-    html += '<div style="font-size:11px;color:#7c9eff;margin-bottom:4px;text-transform:uppercase">' + (catLabels[cat] || cat) + '</div>';
-    categories[cat].forEach(([key, val]) => {{
-      const displayKey = key.includes('.') ? key.split('.').slice(1).join('.') : key;
-      const isSeq = key.includes('sequence.full') || key.includes('sequence.mature');
-      if (isSeq && val.length > 20) {{
-        html += '<div class="tag"><span class="tag-key">' + displayKey + ':</span> <div class="tag-seq">' + val + '</div></div>';
-      }} else {{
-        html += '<div class="tag"><span class="tag-key">' + displayKey + ':</span> <span class="tag-val"> ' + val + '</span></div>';
-      }}
+  const order = ['core','taxonomy','venom','sequence','structure','prediction','identity','source'];
+  const labels = {{ core:'Identity', taxonomy:'Taxonomy', venom:'Venom', sequence:'Sequence', structure:'Structure', prediction:'Predictions', identity:'Cross-references', source:'Source' }};
+  order.forEach(c => {{
+    if (!cats[c]) return;
+    h += '<div class="cat-section"><div class="cat-label">'+(labels[c]||c)+'</div>';
+    cats[c].forEach(([k,v]) => {{
+      const dk = k.includes('.') ? k.split('.').slice(1).join('.') : k;
+      const isSeq = k.includes('sequence.full') || k.includes('sequence.mature');
+      h += isSeq && v.length>20
+        ? '<div class="tag"><span class="tag-key">'+dk+':</span><div class="tag-seq">'+v+'</div></div>'
+        : '<div class="tag"><span class="tag-key">'+dk+':</span> <span class="tag-val">'+v+'</span></div>';
     }});
-    html += '</div>';
+    h += '</div>';
   }});
-  panel.innerHTML = html;
+  panel.innerHTML = h;
 }}
 
 function drawGenomicContext(protein) {{
-  const canvas = document.getElementById('genomic-canvas');
+  const canvas = $('genomic-canvas');
   const ctx = canvas.getContext('2d');
-  const W = canvas.width = canvas.parentElement.clientWidth - 16;
-  const H = canvas.height = 190;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 24;
+  const H = 175;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
 
-  // Find matching scaffold for this protein
-  const species = (protein['taxonomy.species'] || '').replace(/ /g, '_');
-  let matchedRegion = null;
-  let matchedGene = null;
+  const bgCol = getVar('--bg4'), fgCol = getVar('--fg'), fg3Col = getVar('--fg3'), fg4Col = getVar('--fg4');
+  const borderCol = getVar('--border'), geneCol = getVar('--gene'), geneStroke = getVar('--gene-stroke'), hlCol = getVar('--gene-hl');
 
+  // Match protein to genomic region
+  const species = (protein['taxonomy.species']||'').replace(/ /g,'_');
+  const pname = (protein.name||'').toLowerCase();
+  const pfam = (protein['venom.family']||'').toLowerCase();
+  let matchedRegion = null, matchedGene = null;
+
+  // Strategy: match by species prefix in scaffold key, then by gene name similarity
   for (const [key, genes] of Object.entries(GENOMIC)) {{
+    const keySpecies = key.split('|')[0].toLowerCase();
+    // Try species match first
+    const speciesMatch = species && keySpecies.includes(species.split('_')[0].toLowerCase());
+    if (!speciesMatch) continue;
+
     for (const gene of genes) {{
-      const nameMatch = protein.name && gene.name.includes(protein.name.split('_')[0]);
-      const familyMatch = protein['venom.family'] && gene.name.toLowerCase().includes(protein['venom.family'].toLowerCase().substring(0, 3));
-      if (nameMatch || familyMatch) {{
+      const gn = gene.name.toLowerCase();
+      // Match by protein name parts
+      const nameParts = pname.replace(/[^a-z0-9]/g,' ').split(/\\s+/).filter(p => p.length > 2);
+      const hit = nameParts.some(part => gn.includes(part));
+      if (hit) {{
         matchedRegion = {{ key, genes }};
         matchedGene = gene;
         break;
       }}
     }}
+    // If we found a species match but no specific gene, show the region anyway
+    if (!matchedRegion && genes.length > 0) {{
+      matchedRegion = {{ key, genes }};
+    }}
     if (matchedRegion) break;
   }}
 
+  // Fallback: match by venom family to any region
+  if (!matchedRegion && pfam) {{
+    for (const [key, genes] of Object.entries(GENOMIC)) {{
+      for (const gene of genes) {{
+        if (gene.name.toLowerCase().includes(pfam.substring(0,3))) {{
+          matchedRegion = {{ key, genes }};
+          matchedGene = gene;
+          break;
+        }}
+      }}
+      if (matchedRegion) break;
+    }}
+  }}
+
   if (!matchedRegion) {{
-    ctx.fillStyle = '#555';
-    ctx.font = '13px sans-serif';
-    ctx.fillText('No genomic context available for this protein', 20, H / 2);
-    ctx.fillStyle = '#444';
+    ctx.fillStyle = fg4Col;
+    ctx.font = '12px sans-serif';
+    ctx.fillText('No genomic context available for this protein', 20, H/2 - 8);
     ctx.font = '11px sans-serif';
-    ctx.fillText('Genomic coordinates needed (GFF annotation)', 20, H / 2 + 20);
+    ctx.fillText('Requires GFF annotation linking protein to genomic coordinates', 20, H/2 + 10);
+    $('genomic-info').textContent = '';
     return;
   }}
 
-  // Draw gene arrows
   const genes = matchedRegion.genes;
   const minPos = Math.min(...genes.map(g => g.start));
   const maxPos = Math.max(...genes.map(g => g.end));
   const range = maxPos - minPos || 1;
-  const margin = 60;
-  const trackY = H / 2;
-  const geneH = 24;
-  const scale = (W - margin * 2) / range;
+  const mx = 50, trackY = H * 0.55, gH = 22, arrowW = 8;
+  const scale = (W - mx*2) / range;
 
-  // Scaffold line
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(margin, trackY);
-  ctx.lineTo(W - margin, trackY);
-  ctx.stroke();
-
-  // Label
-  ctx.fillStyle = '#666';
-  ctx.font = '10px sans-serif';
+  // Info label
   const parts = matchedRegion.key.split('|');
-  ctx.fillText(parts[0] + ' : ' + parts[1], margin, 14);
-  ctx.fillText(minPos.toLocaleString() + ' – ' + maxPos.toLocaleString() + ' bp', margin, 26);
+  $('genomic-info').textContent = parts[0].replace(/_/g,' ') + '  ·  ' + parts[1] + '  ·  ' + (range/1000).toFixed(0) + ' kb region  ·  ' + genes.length + ' genes';
+
+  // Scale bar
+  const niceStep = Math.pow(10, Math.floor(Math.log10(range/4)));
+  const scaleBarBp = niceStep;
+  const scaleBarPx = scaleBarBp * scale;
+  ctx.strokeStyle = fg4Col; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(mx, H-12); ctx.lineTo(mx + scaleBarPx, H-12); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx, H-16); ctx.lineTo(mx, H-8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx+scaleBarPx, H-16); ctx.lineTo(mx+scaleBarPx, H-8); ctx.stroke();
+  ctx.fillStyle = fg4Col; ctx.font = '9px sans-serif';
+  ctx.fillText((scaleBarBp >= 1000 ? (scaleBarBp/1000)+'kb' : scaleBarBp+'bp'), mx + scaleBarPx/2 - 10, H-2);
+
+  // Chromosome line
+  ctx.strokeStyle = borderCol; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(mx-10, trackY); ctx.lineTo(W-mx+10, trackY); ctx.stroke();
+
+  // Tick marks
+  ctx.strokeStyle = fg4Col; ctx.lineWidth = 0.5;
+  for (let p = Math.ceil(minPos/niceStep)*niceStep; p <= maxPos; p += niceStep) {{
+    const x = mx + (p - minPos) * scale;
+    ctx.beginPath(); ctx.moveTo(x, trackY-3); ctx.lineTo(x, trackY+3); ctx.stroke();
+  }}
 
   // Draw genes
   genes.forEach((gene, i) => {{
-    const x1 = margin + (gene.start - minPos) * scale;
-    const x2 = margin + (gene.end - minPos) * scale;
-    const w = Math.max(x2 - x1, 3);
-    const isHighlight = gene === matchedGene;
-    const row = i % 2;  // stagger
-    const y = trackY - geneH / 2 - (row ? geneH + 4 : 0);
+    const x1 = mx + (gene.start - minPos) * scale;
+    const x2 = mx + (gene.end - minPos) * scale;
+    const w = Math.max(x2 - x1, 6);
+    const isHL = gene === matchedGene;
+    const above = gene.strand === '+';
+    const y = above ? trackY - gH - 6 : trackY + 6;
 
-    // Gene body
-    ctx.fillStyle = isHighlight ? '#F38400' : '#3a5a8a';
-    ctx.strokeStyle = isHighlight ? '#F38400' : '#5a7aaa';
+    // Arrow body
+    ctx.fillStyle = isHL ? hlCol : geneCol;
+    ctx.strokeStyle = isHL ? hlCol : geneStroke;
     ctx.lineWidth = 1;
-
-    // Arrow shape
     ctx.beginPath();
     if (gene.strand === '+') {{
-      ctx.moveTo(x1, y);
-      ctx.lineTo(x1 + w - 6, y);
-      ctx.lineTo(x1 + w, y + geneH / 2);
-      ctx.lineTo(x1 + w - 6, y + geneH);
-      ctx.lineTo(x1, y + geneH);
+      const aw = Math.min(arrowW, w * 0.3);
+      ctx.moveTo(x1, y); ctx.lineTo(x1+w-aw, y); ctx.lineTo(x1+w, y+gH/2);
+      ctx.lineTo(x1+w-aw, y+gH); ctx.lineTo(x1, y+gH);
     }} else {{
-      ctx.moveTo(x1 + 6, y);
-      ctx.lineTo(x1 + w, y);
-      ctx.lineTo(x1 + w, y + geneH);
-      ctx.lineTo(x1 + 6, y + geneH);
-      ctx.lineTo(x1, y + geneH / 2);
+      const aw = Math.min(arrowW, w * 0.3);
+      ctx.moveTo(x1+aw, y); ctx.lineTo(x1+w, y); ctx.lineTo(x1+w, y+gH);
+      ctx.lineTo(x1+aw, y+gH); ctx.lineTo(x1, y+gH/2);
     }}
-    ctx.closePath();
-    ctx.fill();
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    // Stem to track
+    ctx.strokeStyle = isHL ? hlCol+'88' : borderCol;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x1+w/2, above ? y+gH : y);
+    ctx.lineTo(x1+w/2, trackY);
     ctx.stroke();
 
-    // Gene name
-    ctx.fillStyle = isHighlight ? '#fff' : '#ccc';
-    ctx.font = (isHighlight ? 'bold ' : '') + '10px sans-serif';
-    const label = gene.name.length > 12 ? gene.name.substring(0, 12) + '..' : gene.name;
-    ctx.fillText(label, x1 + 3, y + geneH / 2 + 3);
-
-    // Connector to track
-    if (row) {{
-      ctx.strokeStyle = '#333';
-      ctx.beginPath();
-      ctx.moveTo(x1 + w / 2, y + geneH);
-      ctx.lineTo(x1 + w / 2, trackY);
-      ctx.stroke();
+    // Label (only if gene wide enough or highlighted)
+    if (w > 30 || isHL) {{
+      ctx.fillStyle = isHL ? '#fff' : fgCol;
+      ctx.font = (isHL ? 'bold ' : '') + '9px sans-serif';
+      const lbl = gene.name.length > 14 ? gene.name.substring(0,13)+'..' : gene.name;
+      const textY = above ? y - 3 : y + gH + 10;
+      ctx.fillText(lbl, x1 + 2, textY);
     }}
   }});
+
+  // Highlight ring
+  if (matchedGene) {{
+    const x1 = mx + (matchedGene.start - minPos) * scale;
+    const x2 = mx + (matchedGene.end - minPos) * scale;
+    const w = Math.max(x2-x1, 6);
+    const above = matchedGene.strand === '+';
+    const y = above ? trackY - gH - 6 : trackY + 6;
+    ctx.strokeStyle = hlCol; ctx.lineWidth = 2;
+    ctx.strokeRect(x1-3, y-3, w+6, gH+6);
+  }}
 }}
 
-// Event handlers
+// Events
 colorSel.addEventListener('change', () => {{ currentColorCol = colorSel.value; renderScatter(); }});
-document.getElementById('projection').addEventListener('change', (e) => {{ currentProj = e.target.value; renderScatter(); }});
+$('projection').addEventListener('change', e => {{ currentProj = e.target.value; renderScatter(); }});
 
-document.getElementById('scatter').addEventListener('plotly_click', (e) => {{
-  if (e.detail && e.detail.points && e.detail.points[0]) {{
-    const protein = e.detail.points[0].customdata;
-    showProteinPanel(protein);
-    drawGenomicContext(protein);
-  }}
-}});
-
-// Plotly click via internal API
-document.getElementById('scatter').on && document.getElementById('scatter').on('plotly_click', (data) => {{
-  if (data.points && data.points[0]) {{
-    const protein = data.points[0].customdata;
-    showProteinPanel(protein);
-    drawGenomicContext(protein);
-  }}
-}});
-
-// Search
-document.getElementById('search').addEventListener('input', (e) => {{
+$('search').addEventListener('input', e => {{
   const q = e.target.value.toLowerCase();
-  if (q.length < 2) {{ renderScatter(); return; }}
-  // Highlight matching points (just re-render with filter info)
-  const matches = PROTEINS.filter(p =>
-    (p.name || '').toLowerCase().includes(q) ||
-    (p.identifier || '').toLowerCase().includes(q) ||
-    (p.description || '').toLowerCase().includes(q)
-  );
-  if (matches.length === 1) {{
-    showProteinPanel(matches[0]);
-    drawGenomicContext(matches[0]);
-  }}
+  if (q.length < 2) return;
+  const m = PROTEINS.filter(p => (p.name||'').toLowerCase().includes(q) || (p.identifier||'').toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q));
+  if (m.length === 1) {{ showProteinPanel(m[0]); drawGenomicContext(m[0]); }}
 }});
 
-// Initial render
 renderScatter();
 
-// Fix Plotly click for scattergl
 setTimeout(() => {{
-  const scatterDiv = document.getElementById('scatter');
-  scatterDiv.on('plotly_click', (data) => {{
+  $('scatter').on('plotly_click', data => {{
     if (data.points && data.points[0]) {{
-      const protein = data.points[0].customdata;
-      showProteinPanel(protein);
-      drawGenomicContext(protein);
+      const p = data.points[0].customdata;
+      showProteinPanel(p); drawGenomicContext(p);
     }}
   }});
-}}, 500);
+}}, 300);
 </script>
 </body>
 </html>"""
