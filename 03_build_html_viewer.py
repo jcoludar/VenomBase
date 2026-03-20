@@ -85,15 +85,21 @@ def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_pat
 
     # Bake genomic windows into protein records
     # Each window is a scaffold region with venom genes + flanking
+    # genomic_data can be either raw windows (from load_genomic_context)
+    # or pre-built JSON dicts (from callers like 04/05)
     genomic_windows = []
     for win in genomic_data:
-        genomic_windows.append({
-            "species": win["species"],
-            "scaffold": win["scaffold"],
-            "n_venom": win["n_venom"],
-            "loci": [{"n": l["name"], "s": l["start"], "e": l["end"],
-                       "d": l["strand"], "v": l["is_venom"]} for l in win["loci"]],
-        })
+        if "loci" in win and win["loci"] and isinstance(win["loci"][0], dict) and "n" in win["loci"][0]:
+            # Already in compact format
+            genomic_windows.append(win)
+        else:
+            genomic_windows.append({
+                "species": win["species"],
+                "scaffold": win["scaffold"],
+                "n_venom": win["n_venom"],
+                "loci": [{"n": l["name"], "s": l["start"], "e": l["end"],
+                           "d": l["strand"], "v": l["is_venom"]} for l in win["loci"]],
+            })
 
     proteins_json = json.dumps(proteins, default=str)
     color_columns_json = json.dumps(color_columns)
