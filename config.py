@@ -7,7 +7,7 @@ from pathlib import Path
 
 # --- Paths ---
 REPO_ROOT = Path(__file__).resolve().parent
-SE_ROOT = REPO_ROOT.parent.parent  # SpeciesEmbedding root
+SE_ROOT = REPO_ROOT.parent.parent  # Parent repository root
 
 # Project directories
 DATA_DIR = REPO_ROOT / "data"
@@ -36,7 +36,7 @@ THRFTX_DIR = DATA_DIR / "3ftx_evolution"
 THRFTX_MASTER_CSV = THRFTX_DIR / "3and6.csv"
 THRFTX_DATASET = THRFTX_DIR / "supplementary" / "SD1_Dataset_and_information.csv"
 
-# Symlinked data from SpeciesEmbedding (local dev only)
+# Symlinked data from parent repository (local dev only)
 SNAKE_VENOM_DIR = DATA_DIR / "snake_venom"
 CONOTOXIN_DIR = DATA_DIR / "conotoxin"
 KUNITZ_DIR = DATA_DIR / "kunitz"
@@ -46,12 +46,9 @@ ANT_VENOMS_DIR = DATA_DIR / "ant_venoms"
 NEMERTEA_DIR = DATA_DIR / "nemertea_toxprot"
 BUNDLES_DIR = DATA_DIR / "bundles"
 
-# --- Tools (from SpeciesEmbedding) ---
+# --- Tools (from parent repository) ---
 TOOLS_DIR = SE_ROOT / "tools"
 PROTSPACE_DIR = TOOLS_DIR / "protspace" / "protspace"
-
-# --- ProtXplain (separate repo) ---
-PROTXPLAIN_ROOT = SE_ROOT.parent / "ProtXplain"
 
 # --- Parameters ---
 # Embedding models

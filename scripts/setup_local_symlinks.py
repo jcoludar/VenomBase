@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Set up symlinks to local SpeciesEmbedding data for development.
+"""Set up symlinks to local parent repository data for development.
 
 This script is for local development only — it symlinks venom-related
-data from the parent SpeciesEmbedding repository into data/.
+data from the parent repository into data/.
 On GitHub, users should use download_data.py instead.
 """
 
@@ -10,9 +10,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = REPO_ROOT / "data"
-SE_ROOT = REPO_ROOT.parent.parent  # SpeciesEmbedding root
+SE_ROOT = REPO_ROOT.parent.parent  # Parent repository root
 
-# Mapping: local name → path relative to SpeciesEmbedding root
+# Mapping: local name → path relative to parent repository root
 SYMLINKS = {
     "bee_venom": "data/bee_venom",
     "serine_protease": "data/serine_protease",

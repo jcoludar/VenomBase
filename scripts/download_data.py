@@ -2,7 +2,7 @@
 """Download reference datasets for VenomsBase development.
 
 Downloads publicly available venom protein datasets from UniProt/ToxProt
-and other sources. For local SpeciesEmbedding data, use setup_local_symlinks.py.
+and other sources. For local development data, use setup_local_symlinks.py.
 """
 
 from pathlib import Path

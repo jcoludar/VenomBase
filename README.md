@@ -2,13 +2,13 @@
 
 Embedding-centric data architecture for VenomsBase — a community knowledgebase for venom research.
 
-This repository contains the architecture proposal, data model, and reference implementation for organizing venom data as protein-centric embeddings with rich metadata tags. It serves as the first vertical implementation of the Species Embedding framework.
+This repository contains the architecture proposal, data model, and reference implementation for organizing venom data as protein-centric embeddings with rich metadata tags.
 
 ## Vision
 
 Everything becomes an embedding. Proteins, genes, species — each is a point in a learned manifold. Sequence, structure, taxonomy, expression, bioactivity, genomic context — these are all *tags* on the embedding, not the data itself. The embedding IS the data.
 
-VenomsBase proves this pattern for venomics. ProtXplain provides the workflow engine. Species Embedding is the unified space.
+VenomsBase proves this pattern for venomics.
 
 ## Architecture
 
@@ -20,7 +20,7 @@ Data files are not tracked in this repository. Use the download scripts:
 
 ```bash
 python scripts/download_data.py          # Download reference datasets
-python scripts/setup_local_symlinks.py   # Symlink to local SpeciesEmbedding data (dev only)
+python scripts/setup_local_symlinks.py   # Symlink to local parent repository data (dev only)
 ```
 
 ## Authors

@@ -2,8 +2,8 @@
 """Step 02: Build VenomsBase prototype ProtSpace bundle.
 
 Creates a .parquetbundle from the unified dataset that can be viewed
-in ProtSpace or ProtXplain. Uses existing ProtT5 embeddings where
-available, generates UMAP projections.
+in ProtSpace. Uses existing ProtT5 embeddings where available,
+generates UMAP projections.
 
 The bundle demonstrates the embedding-centric architecture:
 - Each protein is a point in embedding space

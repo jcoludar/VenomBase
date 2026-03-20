@@ -40,7 +40,7 @@ Embeddings solve this because:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    VISUALIZATION LAYER                    │
-│         ProtSpace / ProtXplore (WebGL scatter)           │
+│             ProtSpace (WebGL scatter)                      │
 │    Click a point → see all tags → comment / annotate     │
 └────────────────────────┬────────────────────────────────┘
                          │
@@ -161,13 +161,13 @@ Following Todd's platinum/gold/silver/bronze concept, but defined by tag coverag
 
 ## Storage Format: ProtSpace Bundle
 
-The prototype ships as a `.parquetbundle` — the same format already used by ProtSpace
-and ProtXplain. This means:
+The prototype ships as a `.parquetbundle` — the same format already used by ProtSpace.
+This means:
 
 1. **Immediately visualizable** — drag into ProtSpace web app, explore
 2. **Lightweight** — a few MB for thousands of proteins
 3. **Self-contained** — annotations + projections + settings in one file
-4. **Compatible** — works with existing ProtXplain/ProtSpace infrastructure
+4. **Compatible** — works with existing ProtSpace infrastructure
 
 For the full database (Phase 2+), the bundle is the **export/visualization format**.
 The system-of-record can be PostgreSQL (as Todd proposes) or SQLite, with tags stored
@@ -197,28 +197,28 @@ exploration.
 - PostgreSQL system-of-record (Todd's relational schema for provenance)
 - REST API serving protein records with tags
 - Bundle export endpoint (generate ProtSpace bundles on demand)
-- ProtXplain integration: VenomsBase as a data source module
+- Visual workflow platform integration: VenomsBase as a data source module
 
 ### Phase 3: Full Platform
-- ProtXplain frontend: genomics viewer, species selector, protein space
-- User comments/discussion per protein (ProtColab)
+- Visual workflow platform frontend: genomics viewer, species selector, protein space
+- User comments/discussion per protein
 - Community curation workflows
-- Species Embedding integration: venom proteins as first vertical
+- Unified embedding framework integration: venom proteins as first vertical
 
-## Relationship to Species Embedding
+## Relationship to the Unified Embedding Framework
 
 VenomsBase is the first domain-specific implementation of a broader framework:
 
 ```
 VenomsBase (venom proteins)
     ↓ generalizes to
-ProtXplain (all proteins)
+Visual workflow platform (all proteins)
     ↓ generalizes to
-Species Embedding (all biological data)
+Unified embedding framework (all biological data)
     H(s) = (h_hyp, h_euc) — product manifold per species
 ```
 
-The protein embedding in VenomsBase is a component of the full species embedding.
+The protein embedding in VenomsBase is a component of the full unified embedding.
 As the framework matures, VenomsBase proteins gain additional context: their species'
 position in taxonomy space (hyperbolic), their genomic neighborhood (synteny
 embeddings), their expression profile (transcriptomic embeddings).
@@ -259,5 +259,5 @@ all are tag operations, not schema migrations.
 
 1. **Immediate:** Build prototype bundle from 3 published datasets → ship to Todd
 2. **Short-term:** Set up GitHub repo, define tag ontology, write REST API spec
-3. **Medium-term:** ProtXplain module with VenomsBase backend
-4. **Long-term:** Community platform with Species Embedding integration
+3. **Medium-term:** Visual workflow platform module with VenomsBase backend
+4. **Long-term:** Community platform with unified embedding framework integration
