@@ -52,72 +52,9 @@ def load_bundle_projections(bundle_path):
 
 
 def load_genomic_context():
-    """Parse GFF data for genomic context panel.
-
-    Extracts gene positions from SP and 3FTx GFF annotations.
-    Returns dict: scaffold -> list of {name, start, end, strand, evalue}.
-    """
-    genomic_data = {}
-
-    # Parse SP GFFs (exon-level BLAST hits → group by gene name → get gene bounds)
-    for gff_name in ["TS.gff", "Crvi_mi2.gff"]:
-        gff_path = config.SP_DIR / "genomic_annotations" / gff_name
-        if not gff_path.exists():
-            continue
-
-        species = "Thamnophis_sirtalis" if "TS" in gff_name else "Crotalus_viridis"
-        genes = {}  # gene_name -> {scaffold, min_start, max_end, strand, best_evalue}
-
-        with open(gff_path) as f:
-            for line in f:
-                if line.startswith("#"):
-                    continue
-                parts = line.strip().split("\t")
-                if len(parts) < 9:
-                    continue
-
-                scaffold = parts[0]
-                start = int(parts[3])
-                end = int(parts[4])
-                strand = parts[6]
-                attrs = parts[8]
-
-                # Extract gene name
-                name = ""
-                for attr in attrs.split(";"):
-                    if attr.startswith("Name="):
-                        name = attr.split("=")[1].split("_e")[0]  # Remove exon suffix
-                        break
-
-                if not name:
-                    continue
-
-                key = f"{species}|{scaffold}|{name}"
-                if key not in genes:
-                    genes[key] = {
-                        "species": species,
-                        "scaffold": scaffold,
-                        "name": name,
-                        "start": min(start, end),
-                        "end": max(start, end),
-                        "strand": strand,
-                    }
-                else:
-                    genes[key]["start"] = min(genes[key]["start"], start, end)
-                    genes[key]["end"] = max(genes[key]["end"], start, end)
-
-        # Group by scaffold
-        for key, gene in genes.items():
-            scaffold_key = f"{gene['species']}|{gene['scaffold']}"
-            if scaffold_key not in genomic_data:
-                genomic_data[scaffold_key] = []
-            genomic_data[scaffold_key].append(gene)
-
-    # Sort genes by position within each scaffold
-    for key in genomic_data:
-        genomic_data[key].sort(key=lambda g: g["start"])
-
-    return genomic_data
+    """Load genomic windows from GFF data via src/genomic_context.py."""
+    from src.genomic_context import load_all_genomic_context
+    return load_all_genomic_context(config.SP_DIR)
 
 
 def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_path):
@@ -146,17 +83,21 @@ def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_pat
         if 2 <= nunique <= 50:
             color_columns.append(col)
 
-    # Build genomic context JSON (simplified for embedding)
-    genomic_json = {}
-    for scaffold_key, genes in genomic_data.items():
-        genomic_json[scaffold_key] = [
-            {"name": g["name"], "start": g["start"], "end": g["end"], "strand": g["strand"]}
-            for g in genes
-        ]
+    # Bake genomic windows into protein records
+    # Each window is a scaffold region with venom genes + flanking
+    genomic_windows = []
+    for win in genomic_data:
+        genomic_windows.append({
+            "species": win["species"],
+            "scaffold": win["scaffold"],
+            "n_venom": win["n_venom"],
+            "loci": [{"n": l["name"], "s": l["start"], "e": l["end"],
+                       "d": l["strand"], "v": l["is_venom"]} for l in win["loci"]],
+        })
 
     proteins_json = json.dumps(proteins, default=str)
     color_columns_json = json.dumps(color_columns)
-    genomic_json_str = json.dumps(genomic_json)
+    genomic_json_str = json.dumps(genomic_windows)
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -226,7 +167,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 <script>
 const PROTEINS = {proteins_json};
 const COLOR_COLUMNS = {color_columns_json};
-const GENOMIC = {genomic_json_str};
+const GWINDOWS = {genomic_json_str};
 const PALETTE = ['#F3C300','#875692','#F38400','#A1CAF1','#BE0032','#C2B280','#848482','#008856','#E68FAC','#0067A5','#F99379','#604E97','#F6A600','#B3446C','#DCD300','#882D17','#8DB600','#654522','#E25822','#2B3D26','#F2F3F4','#555555'];
 
 let currentColorCol = '', currentProj = 'umap', isDark = true;
@@ -321,149 +262,145 @@ function drawGenomicContext(protein) {{
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
 
-  const bgCol = getVar('--bg4'), fgCol = getVar('--fg'), fg3Col = getVar('--fg3'), fg4Col = getVar('--fg4');
-  const borderCol = getVar('--border'), geneCol = getVar('--gene'), geneStroke = getVar('--gene-stroke'), hlCol = getVar('--gene-hl');
+  const fgCol = getVar('--fg'), fg3Col = getVar('--fg3'), fg4Col = getVar('--fg4');
+  const borderCol = getVar('--border'), hlCol = getVar('--gene-hl');
+  const venomCol = getVar('--gene'), venomStroke = getVar('--gene-stroke');
+  const greyFill = isDark ? '#2a2a2a' : '#ccc';
+  const greyStroke = isDark ? '#444' : '#aaa';
 
-  // Match protein to genomic region
-  const species = (protein['taxonomy.species']||'').replace(/ /g,'_');
-  const pname = (protein.name||'').toLowerCase();
-  const pfam = (protein['venom.family']||'').toLowerCase();
-  let matchedRegion = null, matchedGene = null;
+  // Find best matching genomic window for this protein
+  const pSpecies = (protein['taxonomy.species']||'').toLowerCase();
+  const pName = (protein.name||'').toLowerCase();
+  const pFamily = (protein['venom.family']||'').toLowerCase();
+  let bestWin = null, bestGeneIdx = -1;
 
-  // Strategy: match by species prefix in scaffold key, then by gene name similarity
-  for (const [key, genes] of Object.entries(GENOMIC)) {{
-    const keySpecies = key.split('|')[0].toLowerCase();
-    // Try species match first
-    const speciesMatch = species && keySpecies.includes(species.split('_')[0].toLowerCase());
-    if (!speciesMatch) continue;
+  for (const win of GWINDOWS) {{
+    const wSpecies = win.species.toLowerCase();
+    // Score: species match + gene name match
+    const speciesHit = pSpecies && (wSpecies.includes(pSpecies.split(' ')[0]) || pSpecies.includes(wSpecies.split(' ')[0]));
+    if (!speciesHit && !pFamily) continue;
 
-    for (const gene of genes) {{
-      const gn = gene.name.toLowerCase();
-      // Match by protein name parts
-      const nameParts = pname.replace(/[^a-z0-9]/g,' ').split(/\\s+/).filter(p => p.length > 2);
-      const hit = nameParts.some(part => gn.includes(part));
-      if (hit) {{
-        matchedRegion = {{ key, genes }};
-        matchedGene = gene;
-        break;
+    // Look for specific gene name match in this window
+    for (let i = 0; i < win.loci.length; i++) {{
+      const gn = win.loci[i].n.toLowerCase();
+      const nameParts = pName.replace(/[^a-z0-9]/g,' ').split(/\\s+/).filter(p => p.length > 2);
+      if (nameParts.some(part => gn.includes(part))) {{
+        bestWin = win; bestGeneIdx = i; break;
       }}
     }}
-    // If we found a species match but no specific gene, show the region anyway
-    if (!matchedRegion && genes.length > 0) {{
-      matchedRegion = {{ key, genes }};
-    }}
-    if (matchedRegion) break;
-  }}
+    if (bestWin) break;
 
-  // Fallback: match by venom family to any region
-  if (!matchedRegion && pfam) {{
-    for (const [key, genes] of Object.entries(GENOMIC)) {{
-      for (const gene of genes) {{
-        if (gene.name.toLowerCase().includes(pfam.substring(0,3))) {{
-          matchedRegion = {{ key, genes }};
-          matchedGene = gene;
-          break;
+    // Fallback: species match with venom family match
+    if (speciesHit && pFamily) {{
+      const fam3 = pFamily.substring(0,3);
+      for (let i = 0; i < win.loci.length; i++) {{
+        if (win.loci[i].v && win.loci[i].n.toLowerCase().includes(fam3)) {{
+          bestWin = win; bestGeneIdx = i; break;
         }}
       }}
-      if (matchedRegion) break;
     }}
+    // Fallback: any species match to a window with venom genes
+    if (!bestWin && speciesHit && win.n_venom > 0) {{
+      bestWin = win;
+    }}
+    if (bestWin) break;
   }}
 
-  if (!matchedRegion) {{
-    ctx.fillStyle = fg4Col;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('No genomic context available for this protein', 20, H/2 - 8);
-    ctx.font = '11px sans-serif';
-    ctx.fillText('Requires GFF annotation linking protein to genomic coordinates', 20, H/2 + 10);
+  // Final fallback: show any window with most venom genes (for demo)
+  if (!bestWin && GWINDOWS.length > 0) {{
+    bestWin = GWINDOWS.reduce((a, b) => a.n_venom > b.n_venom ? a : b);
+  }}
+
+  if (!bestWin || bestWin.loci.length === 0) {{
+    ctx.fillStyle = fg4Col; ctx.font = '12px sans-serif';
+    ctx.fillText('No genomic context available', 20, H/2);
     $('genomic-info').textContent = '';
     return;
   }}
 
-  const genes = matchedRegion.genes;
-  const minPos = Math.min(...genes.map(g => g.start));
-  const maxPos = Math.max(...genes.map(g => g.end));
+  const loci = bestWin.loci;
+  const minPos = Math.min(...loci.map(l => l.s));
+  const maxPos = Math.max(...loci.map(l => l.e));
   const range = maxPos - minPos || 1;
-  const mx = 50, trackY = H * 0.55, gH = 22, arrowW = 8;
-  const scale = (W - mx*2) / range;
+  const mx = 40, trackY = Math.round(H * 0.52), gH = 20, arrowW = 7;
+  const scale = (W - mx * 2) / range;
 
-  // Info label
-  const parts = matchedRegion.key.split('|');
-  $('genomic-info').textContent = parts[0].replace(/_/g,' ') + '  ·  ' + parts[1] + '  ·  ' + (range/1000).toFixed(0) + ' kb region  ·  ' + genes.length + ' genes';
+  // Info
+  const nVenom = loci.filter(l => l.v).length;
+  $('genomic-info').textContent = bestWin.species + '  ·  ' + bestWin.scaffold + '  ·  ' + (range/1000).toFixed(0) + ' kb  ·  ' + nVenom + ' venom / ' + loci.length + ' total genes';
+
+  // Chromosome backbone
+  ctx.strokeStyle = borderCol; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(mx - 8, trackY); ctx.lineTo(W - mx + 8, trackY); ctx.stroke();
 
   // Scale bar
-  const niceStep = Math.pow(10, Math.floor(Math.log10(range/4)));
-  const scaleBarBp = niceStep;
-  const scaleBarPx = scaleBarBp * scale;
+  const niceStep = Math.pow(10, Math.floor(Math.log10(range / 4)));
+  const sbPx = niceStep * scale;
   ctx.strokeStyle = fg4Col; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(mx, H-12); ctx.lineTo(mx + scaleBarPx, H-12); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(mx, H-16); ctx.lineTo(mx, H-8); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(mx+scaleBarPx, H-16); ctx.lineTo(mx+scaleBarPx, H-8); ctx.stroke();
-  ctx.fillStyle = fg4Col; ctx.font = '9px sans-serif';
-  ctx.fillText((scaleBarBp >= 1000 ? (scaleBarBp/1000)+'kb' : scaleBarBp+'bp'), mx + scaleBarPx/2 - 10, H-2);
+  ctx.beginPath(); ctx.moveTo(W - mx - sbPx, H - 10); ctx.lineTo(W - mx, H - 10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W - mx - sbPx, H - 14); ctx.lineTo(W - mx - sbPx, H - 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W - mx, H - 14); ctx.lineTo(W - mx, H - 6); ctx.stroke();
+  ctx.fillStyle = fg4Col; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(niceStep >= 1000 ? (niceStep/1000) + ' kb' : niceStep + ' bp', W - mx - sbPx/2, H - 1);
+  ctx.textAlign = 'left';
 
-  // Chromosome line
-  ctx.strokeStyle = borderCol; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(mx-10, trackY); ctx.lineTo(W-mx+10, trackY); ctx.stroke();
+  // Draw each gene
+  loci.forEach((gene, i) => {{
+    const x1 = mx + (gene.s - minPos) * scale;
+    const x2 = mx + (gene.e - minPos) * scale;
+    const w = Math.max(x2 - x1, 8);
+    const isHL = i === bestGeneIdx;
+    const isVenom = gene.v;
+    const above = gene.d === '+';
+    const y = above ? trackY - gH - 4 : trackY + 4;
 
-  // Tick marks
-  ctx.strokeStyle = fg4Col; ctx.lineWidth = 0.5;
-  for (let p = Math.ceil(minPos/niceStep)*niceStep; p <= maxPos; p += niceStep) {{
-    const x = mx + (p - minPos) * scale;
-    ctx.beginPath(); ctx.moveTo(x, trackY-3); ctx.lineTo(x, trackY+3); ctx.stroke();
-  }}
+    // Colors: venom = blue/accent, non-venom = grey, highlighted = orange
+    let fill, stroke;
+    if (isHL) {{ fill = hlCol; stroke = hlCol; }}
+    else if (isVenom) {{ fill = venomCol; stroke = venomStroke; }}
+    else {{ fill = greyFill; stroke = greyStroke; }}
 
-  // Draw genes
-  genes.forEach((gene, i) => {{
-    const x1 = mx + (gene.start - minPos) * scale;
-    const x2 = mx + (gene.end - minPos) * scale;
-    const w = Math.max(x2 - x1, 6);
-    const isHL = gene === matchedGene;
-    const above = gene.strand === '+';
-    const y = above ? trackY - gH - 6 : trackY + 6;
-
-    // Arrow body
-    ctx.fillStyle = isHL ? hlCol : geneCol;
-    ctx.strokeStyle = isHL ? hlCol : geneStroke;
-    ctx.lineWidth = 1;
+    ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = 1;
+    const aw = Math.min(arrowW, w * 0.35);
     ctx.beginPath();
-    if (gene.strand === '+') {{
-      const aw = Math.min(arrowW, w * 0.3);
+    if (gene.d === '+') {{
       ctx.moveTo(x1, y); ctx.lineTo(x1+w-aw, y); ctx.lineTo(x1+w, y+gH/2);
       ctx.lineTo(x1+w-aw, y+gH); ctx.lineTo(x1, y+gH);
     }} else {{
-      const aw = Math.min(arrowW, w * 0.3);
       ctx.moveTo(x1+aw, y); ctx.lineTo(x1+w, y); ctx.lineTo(x1+w, y+gH);
       ctx.lineTo(x1+aw, y+gH); ctx.lineTo(x1, y+gH/2);
     }}
     ctx.closePath(); ctx.fill(); ctx.stroke();
 
-    // Stem to track
-    ctx.strokeStyle = isHL ? hlCol+'88' : borderCol;
+    // Stem
+    ctx.strokeStyle = isHL ? hlCol+'66' : (isVenom ? venomStroke+'44' : greyStroke+'44');
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(x1+w/2, above ? y+gH : y);
     ctx.lineTo(x1+w/2, trackY);
     ctx.stroke();
 
-    // Label (only if gene wide enough or highlighted)
-    if (w > 30 || isHL) {{
-      ctx.fillStyle = isHL ? '#fff' : fgCol;
-      ctx.font = (isHL ? 'bold ' : '') + '9px sans-serif';
-      const lbl = gene.name.length > 14 ? gene.name.substring(0,13)+'..' : gene.name;
-      const textY = above ? y - 3 : y + gH + 10;
-      ctx.fillText(lbl, x1 + 2, textY);
+    // Label — always for venom genes, only if space for non-venom
+    if (isVenom || isHL || w > 40) {{
+      ctx.fillStyle = isHL ? '#fff' : (isVenom ? fgCol : fg3Col);
+      ctx.font = (isHL ? 'bold ' : '') + (isVenom ? '10px' : '9px') + ' sans-serif';
+      const lbl = gene.n.length > 16 ? gene.n.substring(0,15)+'..' : gene.n;
+      const ty = above ? y - 2 : y + gH + 11;
+      ctx.fillText(lbl, x1, ty);
     }}
   }});
 
-  // Highlight ring
-  if (matchedGene) {{
-    const x1 = mx + (matchedGene.start - minPos) * scale;
-    const x2 = mx + (matchedGene.end - minPos) * scale;
-    const w = Math.max(x2-x1, 6);
-    const above = matchedGene.strand === '+';
-    const y = above ? trackY - gH - 6 : trackY + 6;
-    ctx.strokeStyle = hlCol; ctx.lineWidth = 2;
-    ctx.strokeRect(x1-3, y-3, w+6, gH+6);
+  // Highlight box around matched gene
+  if (bestGeneIdx >= 0 && bestGeneIdx < loci.length) {{
+    const g = loci[bestGeneIdx];
+    const x1 = mx + (g.s - minPos) * scale;
+    const x2 = mx + (g.e - minPos) * scale;
+    const w = Math.max(x2-x1, 8);
+    const above = g.d === '+';
+    const y = above ? trackY - gH - 4 : trackY + 4;
+    ctx.strokeStyle = hlCol; ctx.lineWidth = 2; ctx.setLineDash([3,2]);
+    ctx.strokeRect(x1 - 4, y - 4, w + 8, gH + 8);
+    ctx.setLineDash([]);
   }}
 }}
 
@@ -508,11 +445,12 @@ def main():
     ann_df, umap, pca = load_bundle_projections(bundle_path)
     print(f"  {len(ann_df)} proteins with projections")
 
-    # Load genomic context
+    # Load genomic context (baked windows)
     print("\n2. Loading genomic context...")
     genomic = load_genomic_context()
-    total_genes = sum(len(g) for g in genomic.values())
-    print(f"  {len(genomic)} scaffolds, {total_genes} genes")
+    total_genes = sum(len(w["loci"]) for w in genomic)
+    total_venom = sum(w["n_venom"] for w in genomic)
+    print(f"  {len(genomic)} windows, {total_genes} genes ({total_venom} venom)")
 
     # Build HTML
     print("\n3. Building HTML...")
