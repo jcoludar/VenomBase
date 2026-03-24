@@ -1,26 +1,40 @@
-# VenomsBase Data Architecture
+# VenomsBase / VenomZone
 
-Embedding-centric data architecture for VenomsBase — a community knowledgebase for venom research.
+Protein-centric data architecture and web platform for venom research.
 
-This repository contains the architecture proposal, data model, and reference implementation for organizing venom data as protein-centric embeddings with rich metadata tags.
+## Data Model
 
-## Vision
+Three object types:
 
-Everything becomes an embedding. Proteins, genes, species — each is a point in a learned manifold. Sequence, structure, taxonomy, expression, bioactivity, genomic context — these are all *tags* on the embedding, not the data itself. The embedding IS the data.
+- **Protein Record** — The primary data container. Each protein carries its embedding (ProtT5), sequences, structure pointers, taxonomy, classification, expression, proteomics, activity, and literature as typed data slots.
+- **Genome Record** — Standalone. Gene annotations and scaffolds from GFF3. Linked to proteins via gene IDs, but not hierarchically above them.
+- **Raw Data** — Stored as files (reads, spectra, matrices). Features extracted into protein/genome records.
 
-VenomsBase proves this pattern for venomics.
+See `docs/architecture_proposal.md` for the full data model.
 
-## Architecture
+## Prototypes
 
-See `docs/architecture_proposal.md` for the full proposal.
+Interactive HTML viewers demonstrating protein-centric exploration:
+
+- **VenomsBase_Snakes.html** — 2,235 snake venom proteins (3FTx + KLK/SP + PLA2) with real ProtT5 embeddings, publication colors, genomic context
+- **VenomsBase_Bees.html** — 4,606 bee venom proteins (33 families) with real ProtT5 embeddings, 739 GFF3 genomic regions across 23 species
+
+Open in Chrome. Click proteins to inspect. Color by any annotation dimension.
 
 ## Data
 
-Data files are not tracked in this repository. Use the download scripts:
+Data files are not tracked in this repository. Use the setup scripts:
 
 ```bash
 python scripts/download_data.py          # Download reference datasets
-python scripts/setup_local_symlinks.py   # Symlink to local parent repository data (dev only)
+python scripts/setup_local_symlinks.py   # Symlink to parent repository data (dev only)
+```
+
+## Pipeline
+
+```bash
+python 04_build_bee_viewer.py     # Bee venom viewer
+python 05_build_snake_viewer.py   # Snake venom viewer
 ```
 
 ## Authors

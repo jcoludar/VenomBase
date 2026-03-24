@@ -57,7 +57,7 @@ def load_genomic_context():
     return load_all_genomic_context(config.SP_DIR)
 
 
-def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_path):
+def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_path, color_map=None, title="VenomsBase"):
     """Build self-contained HTML with Plotly scatter + tag panel + genomic viewer."""
 
     # Prepare protein data as JSON
@@ -109,7 +109,7 @@ def build_html(annotations_df, umap_coords, pca_coords, genomic_data, output_pat
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>VenomsBase Explorer</title>
+<title>{title}</title>
 <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 <style>
 :root {{
@@ -153,14 +153,14 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
 #stats {{ font-size: 11px; color: var(--fg3); margin-left: auto; white-space: nowrap; }}
 </style>
 </head>
-<body>
+<body class="light">
 <div id="app">
   <div id="toolbar">
-    <h1>VenomsBase</h1>
+    <h1>{title}</h1>
     <label>Color: <select id="colorBy"></select></label>
     <label>Proj: <select id="projection"><option value="umap">UMAP</option><option value="pca">PCA</option></select></label>
     <input type="text" id="search" placeholder="Search...">
-    <button id="theme-btn">Light</button>
+    <button id="theme-btn">Dark</button>
     <span id="stats"></span>
   </div>
   <div id="scatter"></div>
@@ -175,8 +175,9 @@ const PROTEINS = {proteins_json};
 const COLOR_COLUMNS = {color_columns_json};
 const GWINDOWS = {genomic_json_str};
 const PALETTE = ['#F3C300','#875692','#F38400','#A1CAF1','#BE0032','#C2B280','#848482','#008856','#E68FAC','#0067A5','#F99379','#604E97','#F6A600','#B3446C','#DCD300','#882D17','#8DB600','#654522','#E25822','#2B3D26','#F2F3F4','#555555'];
+const COLOR_MAP = {json.dumps(color_map or {}) };
 
-let currentColorCol = '', currentProj = 'umap', isDark = true;
+let currentColorCol = '', currentProj = 'umap', isDark = false;
 const $ = id => document.getElementById(id);
 const css = getComputedStyle(document.body);
 const getVar = v => getComputedStyle(document.body).getPropertyValue(v).trim();
@@ -193,8 +194,14 @@ $('theme-btn').addEventListener('click', () => {{
 // Populate color dropdown
 const colorSel = $('colorBy');
 COLOR_COLUMNS.forEach(col => {{ const o = document.createElement('option'); o.value = col; o.textContent = col; colorSel.appendChild(o); }});
-const defaultCol = COLOR_COLUMNS.find(c => c === 'venom.group') || COLOR_COLUMNS.find(c => c === 'venom.family') || COLOR_COLUMNS[0] || '';
+const defaultCol = COLOR_COLUMNS.find(c => c === 'venom_group') || COLOR_COLUMNS.find(c => c === 'venom.group') || COLOR_COLUMNS.find(c => c === 'venom_family') || COLOR_COLUMNS.find(c => c === 'venom.family') || COLOR_COLUMNS[0] || '';
 colorSel.value = defaultCol; currentColorCol = defaultCol;
+
+// Helper: get species field (flexible naming)
+function pGet(protein, ...keys) {{
+  for (const k of keys) {{ if (protein[k] && protein[k] !== 'NaN') return protein[k]; }}
+  return '';
+}}
 
 function getCoords(proj) {{
   return PROTEINS.filter(p => p[proj+'_x'] !== undefined).map(p => ({{ x:p[proj+'_x'], y:p[proj+'_y'], id:p.identifier, name:p.name||p.identifier, protein:p }}));
@@ -209,7 +216,7 @@ function buildTraces(colorCol, proj) {{
     x:pts.map(p=>p.x), y:pts.map(p=>p.y), text:pts.map(p=>p.name), customdata:pts.map(p=>p.protein),
     mode:'markers', type:'scattergl',
     name: (val.length>25 ? val.substring(0,25)+'..' : val) + ' ('+pts.length+')',
-    marker:{{ size:5, color:PALETTE[i%PALETTE.length], opacity:0.8 }},
+    marker:{{ size:5, color: COLOR_MAP[val] || PALETTE[i%PALETTE.length], opacity:0.8 }},
     hovertemplate:'%{{text}}<extra>'+val.substring(0,40)+'</extra>'
   }}));
 }}
@@ -275,44 +282,66 @@ function drawGenomicContext(protein) {{
   const greyStroke = isDark ? '#444' : '#aaa';
 
   // Find best matching genomic window for this protein
-  const pSpecies = (protein['taxonomy.species']||'').toLowerCase();
-  const pName = (protein.name||'').toLowerCase();
-  const pFamily = (protein['venom.family']||'').toLowerCase();
-  let bestWin = null, bestGeneIdx = -1;
+  const pSpecies = pGet(protein, 'species', 'taxonomy.species').toLowerCase();
+  const pName = (protein.name||protein.identifier||'').toLowerCase();
+  const pFamily = pGet(protein, 'venom_family', 'venom.family').toLowerCase();
+  const pGroup = pGet(protein, 'venom_group', 'venom.group').toLowerCase();
+  let bestWin = null, bestGeneIdx = -1, bestScore = 0;
 
   for (const win of GWINDOWS) {{
     const wSpecies = win.species.toLowerCase();
-    // Score: species match + gene name match
     const speciesHit = pSpecies && (wSpecies.includes(pSpecies.split(' ')[0]) || pSpecies.includes(wSpecies.split(' ')[0]));
-    if (!speciesHit && !pFamily) continue;
+    let score = 0;
 
-    // Look for specific gene name match in this window
+    // 1. Gene name match (best)
     for (let i = 0; i < win.loci.length; i++) {{
       const gn = win.loci[i].n.toLowerCase();
       const nameParts = pName.replace(/[^a-z0-9]/g,' ').split(/\\s+/).filter(p => p.length > 2);
       if (nameParts.some(part => gn.includes(part))) {{
-        bestWin = win; bestGeneIdx = i; break;
+        score = speciesHit ? 100 : 50;
+        if (score > bestScore) {{ bestWin = win; bestGeneIdx = i; bestScore = score; }}
+        break;
       }}
     }}
-    if (bestWin) break;
 
-    // Fallback: species match with venom family match
-    if (speciesHit && pFamily) {{
-      const fam3 = pFamily.substring(0,3);
+    // 2. Species + family/group match
+    if (speciesHit && (pFamily || pGroup)) {{
+      const fam3 = (pGroup || pFamily).substring(0,3);
       for (let i = 0; i < win.loci.length; i++) {{
         if (win.loci[i].v && win.loci[i].n.toLowerCase().includes(fam3)) {{
-          bestWin = win; bestGeneIdx = i; break;
+          score = 80;
+          if (score > bestScore) {{ bestWin = win; bestGeneIdx = i; bestScore = score; }}
+          break;
         }}
       }}
     }}
-    // Fallback: any species match to a window with venom genes
-    if (!bestWin && speciesHit && win.n_venom > 0) {{
-      bestWin = win;
+
+    // 3. Species match alone
+    if (speciesHit && !bestWin && win.n_venom > 0) {{
+      score = 30;
+      if (score > bestScore) {{ bestWin = win; bestScore = score; }}
     }}
-    if (bestWin) break;
+
+    // 4. Family match via window.family tag (e.g., "Serine protease", "PLA2")
+    if (!speciesHit && pFamily && win.family && win.family.toLowerCase().includes(pFamily.substring(0,4))) {{
+      score = 25;
+      if (score > bestScore) {{ bestWin = win; bestScore = score; }}
+    }}
+
+    // 5. Family match via gene name patterns
+    if (!speciesHit && (pFamily || pGroup)) {{
+      const fam3 = (pGroup || pFamily).substring(0,3);
+      for (let i = 0; i < win.loci.length; i++) {{
+        if (win.loci[i].v && win.loci[i].n.toLowerCase().includes(fam3)) {{
+          score = 20;
+          if (score > bestScore) {{ bestWin = win; bestGeneIdx = i; bestScore = score; }}
+          break;
+        }}
+      }}
+    }}
   }}
 
-  // Final fallback: show any window with most venom genes (for demo)
+  // Final fallback: show window with most venom genes
   if (!bestWin && GWINDOWS.length > 0) {{
     bestWin = GWINDOWS.reduce((a, b) => a.n_venom > b.n_venom ? a : b);
   }}
@@ -423,14 +452,21 @@ $('search').addEventListener('input', e => {{
 
 renderScatter();
 
-setTimeout(() => {{
-  $('scatter').on('plotly_click', data => {{
-    if (data.points && data.points[0]) {{
-      const p = data.points[0].customdata;
-      showProteinPanel(p); drawGenomicContext(p);
-    }}
-  }});
-}}, 300);
+// Attach click handler after Plotly initializes
+function attachClick() {{
+  const el = $('scatter');
+  if (el && el.on) {{
+    el.on('plotly_click', data => {{
+      if (data.points && data.points[0]) {{
+        const p = data.points[0].customdata;
+        showProteinPanel(p); drawGenomicContext(p);
+      }}
+    }});
+  }} else {{
+    setTimeout(attachClick, 200);
+  }}
+}}
+setTimeout(attachClick, 100);
 </script>
 </body>
 </html>"""

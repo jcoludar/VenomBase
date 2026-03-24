@@ -1,263 +1,154 @@
-# VenomsBase Data Architecture Proposal
+# VenomsBase: Data Architecture Proposal
 
 > Response to: "Species-Centered Database Architecture for VenomsBase" (Castoe, March 2026)
 >
-> Authors: Ivan Koludarov, Todd A. Castoe
-> Date: March 2026
+> Ivan Koludarov — March 2026
 
-## Executive Summary
+## Summary
 
-We propose an **embedding-centric, protein-first** architecture for VenomsBase that
-fulfills all requirements of the species-centered relational schema while adding a
-computational layer that enables modern machine learning, visual exploration, and
-cross-species comparison at scale.
+This document proposes a concrete data architecture for VenomZone, the web platform for VenomsBase. The central idea: **the protein is the primary data object**. Each protein carries its own embedding, sequences, annotations, and links to external data. Genomes are parallel first-class objects with their own viewer. All other data types — transcriptomics, proteomics, structural, functional — attach as features on proteins rather than living in separate relational tables.
 
-The core insight: **the protein embedding IS the data object**. Sequence, structure,
-taxonomy, expression, bioactivity, genomic context — these are all *tags* (metadata
-dimensions) on the embedding, not the data itself. This inverts the traditional
-database-first approach: instead of querying tables to find proteins, you navigate a
-continuous embedding space where similar proteins cluster together regardless of
-species or nomenclature.
+Two working prototypes are attached (interactive HTML viewers for snake and bee venom proteins) to demonstrate how the protein-centric model works in practice.
 
-This architecture is demonstrated with a working prototype using 2,300+ venom
-proteins from three published studies spanning Hymenoptera and Squamata.
+---
 
-## Why Embedding-Centric?
+## 1. Core Concept: Protein as Data Container
 
-Traditional knowledgebases organize data in relational tables. You search by name,
-filter by species, join across tables. This works for known queries but fails for
-the core challenge of venom research: **discovery of unknown relationships**.
+A protein language model (ProtT5) encodes each protein sequence as a 1024-dimensional vector. Proteins with similar sequences, structures, and functions land near each other in this space — regardless of species, naming convention, or database of origin. This gives us a continuous similarity landscape that no relational schema can provide.
 
-Embeddings solve this because:
-1. **Similar proteins cluster together** — even across species, even without shared nomenclature
-2. **Every data type can be projected** — sequence, structure, and function all map to the same space
-3. **Visual exploration is native** — researchers can literally see protein relationships
-4. **New data integrates seamlessly** — drop a new protein in, it finds its neighbors automatically
-5. **Cross-species comparison is implicit** — not a separate analysis step
-
-## Architecture Overview
+Each protein is a self-contained record with typed data slots:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    VISUALIZATION LAYER                    │
-│             ProtSpace (WebGL scatter)                      │
-│    Click a point → see all tags → comment / annotate     │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────┴────────────────────────────────┐
-│                    EMBEDDING LAYER                        │
-│           The protein IS a point in this space            │
-│                                                          │
-│   Per protein: embedding vector (ProtT5 / ESM-2)        │
-│   Projections: UMAP 2D/3D, PCA, t-SNE                   │
-│   Distance = similarity (sequence, structure, function)  │
-└────────────────────────┬────────────────────────────────┘
-                         │
-┌────────────────────────┴────────────────────────────────┐
-│                      TAG LAYER                            │
-│        Every piece of metadata is a tag on the protein    │
-│                                                          │
-│   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│   │ Identity │ │ Taxonomy │ │ Sequence │ │Structure │  │
-│   │ uniprot  │ │ species  │ │ full_seq │ │ pdb_id   │  │
-│   │ genbank  │ │ taxon_id │ │ mature   │ │ LDDT     │  │
-│   │ refseq   │ │ family   │ │ signal_p │ │ TM_score │  │
-│   │ name     │ │ genus    │ │ domains  │ │ RMSD     │  │
-│   └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-│   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│   │  Venom   │ │ Genomics │ │Expression│ │ Activity │  │
-│   │ family   │ │ gene_id  │ │ tissue   │ │ targets  │  │
-│   │ group    │ │ gff_loc  │ │ TPM/FPKM │ │ assays   │  │
-│   │ status   │ │ synteny  │ │ proteome │ │ toxicity │  │
-│   │ evidence │ │ exons    │ │ enriched │ │ IC50     │  │
-│   └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-│   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
-│   │Prediction│ │Phylogeny │ │Literature│ │  User    │  │
-│   │ GO terms │ │ tree_id  │ │ doi      │ │ comments │  │
-│   │ CATH     │ │ orthogrp │ │ pubmed   │ │ ratings  │  │
-│   │ membrane │ │ clade    │ │ curated  │ │ flags    │  │
-│   │ disorder │ │ bootstrap│ │ evidence │ │ notes    │  │
-│   └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
-└─────────────────────────────────────────────────────────┘
+Protein Record
+├── identity
+│   ├── accession, gene name, aliases
+│   └── cross-references (UniProt, GenBank, PDB)
+├── sequences
+│   ├── full-length (canonical)
+│   ├── mature peptide
+│   └── isoforms / splice variants
+├── embeddings
+│   ├── ProtT5 (1024-dim)
+│   └── ESM2, ESM-C (optional)
+├── structure
+│   ├── AlphaFold prediction
+│   └── experimental (PDB)
+├── taxonomy
+│   ├── species, TaxID, common name
+│   └── clade, order, family
+├── classification
+│   ├── venom family + evidence level
+│   ├── venom group / subgroup
+│   └── historical classifications (e.g., Dowell 2016)
+├── expression
+│   ├── tissue-specific TPM/FPKM values
+│   └── sample metadata (tissue, stage, method)
+├── proteomics
+│   ├── detection evidence (PSMs, confidence)
+│   └── PTMs and proteoforms
+├── activity
+│   ├── molecular targets
+│   ├── IC50 / EC50 values
+│   └── assay metadata
+├── genomic context  →  link to Genome Record
+└── literature
+    └── DOIs, PubMed IDs
 ```
 
-## How This Maps to Todd's Schema
+New data types (e.g., spatial transcriptomics, cryo-EM) become new slots on the protein record — no schema migration required.
 
-Every module in the species-centered schema maps directly to a tag category:
+## 2. Three Data Object Types
 
-| Todd's Module | Our Tag Category | Storage |
-|---------------|-----------------|---------|
-| Species & Taxonomy (2A) | `taxonomy.*` | Inline tags |
-| Genome Assembly (2B) | `genomics.assembly_*` | Reference pointer |
-| Gene–Transcript–Protein (2C) | `identity.*` + `sequence.*` | Inline + FASTA |
-| Venom Classification (2C) | `venom.*` | Inline tags (evidence-based, as Todd specifies) |
-| Functional Genomics (3) | `genomics.regulatory_*` | Reference pointer to tracks |
-| Transcriptomics (4) | `expression.*` | Inline values + reference pointer |
-| Proteomics (5) | `proteomics.*` | Inline detection + reference pointer |
-| Structure (6) | `structure.*` | Inline scores + PDB pointer |
-| Gene Family / Comparative (7) | `phylogeny.*` | Inline assignments + tree pointer |
-| Functional Activity (8) | `activity.*` | Inline values |
-| Literature (8) | `literature.*` | DOI/PubMed pointers |
+The architecture uses three object types, not one hierarchy:
 
-**Key compatibility:** Todd's evidence separation principle is preserved. Venom status
-is a tag with an evidence level, not a binary flag. Tags can be updated, versioned,
-and traced to their source.
+| Object | Role | Storage | Viewer |
+|--------|------|---------|--------|
+| **Protein Record** | Primary data container. Carries embedding, sequences, all annotations. | Structured file (Parquet) + embedding vectors (HDF5) | Embedding scatter (UMAP/PCA) + info panel |
+| **Genome Record** | Standalone. Gene annotations, scaffolds, regulatory elements. Linked to proteins via gene IDs. | GFF3 + FASTA references | Genomic context viewer (gene neighborhood canvas) |
+| **Raw Data** | Stored separately, referenced by protein/genome records. Sequencing reads, mass spectra, expression matrices. | Object storage (files) | Not directly visualized — features extracted into protein/genome records |
 
-**What we add:** The embedding layer that makes all of this *navigable*. You don't just
-query "show me all PLA2 from snakes" — you see PLA2 clustering with PLA2 from bees
-and discover shared evolutionary origins visually.
+The key design choice: **genomes and proteins are parallel entities**, not hierarchical. A genome region contains multiple genes; each gene may correspond to a protein in the embedding space. They link to each other, but neither is subordinate.
 
-## The Protein Record
+This differs from the species-centered hierarchy (Species → Genome → Gene → Transcript → Protein) in an important way: the protein is independently queryable. You can find similar proteins across all species by nearest-neighbor search in embedding space, without traversing a join chain.
 
-```python
-@dataclass
-class VenomProtein:
-    """Core data object. Everything is a tag on the embedding."""
+## 3. How -Omics Data Fits
 
-    # Identity (required)
-    identifier: str            # Primary key (UniProt, GenBank, or custom)
-    name: str                  # Human-readable name
+All -omics data types follow the same pattern: **raw data stored as files, extracted features become slots on protein records**.
 
-    # Embedding (the actual data object)
-    embedding: np.ndarray      # ProtT5 or ESM-2 vector (float16)
-    projection_2d: Tuple[float, float]  # UMAP x, y
-    projection_3d: Tuple[float, float, float]  # UMAP x, y, z
+| Data Type | Raw Storage | Feature on Protein | How It's Used |
+|-----------|-------------|-------------------|---------------|
+| **Transcriptomics** | FASTQ/BAM files | `expression.*` (TPM, tissue, stage) | Color by expression level; filter by tissue |
+| **Proteomics** | MS raw files | `proteomics.*` (PSMs, PTMs) | Evidence tags; proteoform annotations |
+| **Structure** | PDB/mmCIF files | `structure.*` (AF confidence, method) | 3D viewer; structural clustering |
+| **Functional assays** | Assay reports | `activity.*` (IC50, target, method) | Activity overlay; target enrichment |
+| **Genomics** | GFF3 + FASTA | `genomic_context` → Genome Record link | Gene neighborhood viewer |
+| **Literature** | — | `literature.*` (DOIs) | Cross-references |
 
-    # Tags (all optional — grow as data becomes available)
-    tags: Dict[str, Any]
-    # tags["taxonomy.species"] = "Naja naja"
-    # tags["taxonomy.taxon_id"] = 8639
-    # tags["taxonomy.family"] = "Elapidae"
-    # tags["sequence.full"] = "MKTLLLTLVVVTIVCLDLG..."
-    # tags["sequence.mature"] = "LECHNQQSSQPPTTK..."
-    # tags["sequence.length"] = 74
-    # tags["venom.family"] = "3FTx"
-    # tags["venom.group"] = "short-chain"
-    # tags["venom.status"] = "curated"
-    # tags["venom.evidence"] = ["proteomics", "expression"]
-    # tags["structure.pdb_id"] = "1IQ9"
-    # tags["structure.lddt"] = 92.3
-    # tags["activity.target"] = "nAChR"
-    # tags["activity.ic50"] = "2.3 nM"
-    # tags["expression.venom_gland_tpm"] = 15234.5
-    # tags["phylogeny.orthogroup"] = "OG0001234"
-    # tags["genomics.chromosome"] = "NW_020769389"
-    # tags["genomics.start"] = 1234567
-    # tags["prediction.go_mfo"] = ["GO:0090729"]  # toxin activity
-    # tags["prediction.membrane"] = "Secreted"
-    # tags["literature.doi"] = ["10.1038/s41467-023-xxxxx"]
-```
+This means every module in the species-centered schema has a concrete home:
 
-## Data Completeness Tiers
+| Species-Centered Module | Protein-Centric Equivalent |
+|------------------------|---------------------------|
+| Species & Taxonomy (2A) | `taxonomy.*` slots on protein record |
+| Genome Assembly (2B) | Genome Record (standalone object) |
+| Gene-Transcript-Protein (2C) | `identity.*` + `sequences.*` slots |
+| Venom Classification (2C) | `classification.*` slots with evidence level |
+| Functional Genomics (3) | Genome Record regulatory features |
+| Transcriptomics (4) | `expression.*` slots |
+| Proteomics (5) | `proteomics.*` slots |
+| Structure (6) | `structure.*` slots |
+| Gene Family (7) | `classification.*` slots |
+| Functional Activity (8) | `activity.*` slots |
 
-Following Todd's platinum/gold/silver/bronze concept, but defined by tag coverage:
+## 4. Why This Matters: The Reclassification Problem
 
-| Tier | Required Tags | Example |
+Dowell et al. (2016) proposed a venom protein family classification that is widely used but increasingly recognized as inaccurate. Our studies (Koludarov et al. 2023) provide updated classifications, but the field still references Dowell's scheme.
+
+**In a relational schema:** updating family assignments means modifying GeneFamily and FamilyMembership tables, cascading through OrthogroupMembership, and potentially breaking saved queries and cross-references.
+
+**In the protein-centric model:** update the `classification.venom_family` slot. The old value is preserved as `classification.venom_family_dowell2016`. No schema changes, no cascading joins, both classifications coexist on the same record.
+
+This generalizes to any reclassification event — nomenclature changes, family reassignments, new evidence. All are slot operations on protein records.
+
+## 5. What the Prototypes Show
+
+The attached HTML viewers demonstrate three interface components:
+
+- **Protein Space:** ProtT5 embedding scatter (UMAP/PCA) as the navigational anchor. Click any protein to inspect it.
+- **Information Panel:** All slots displayed on click — species, family, group, source dataset, gene name.
+- **Genomic Context:** Gene neighborhood canvas showing venom genes (blue) and flanking genes (grey) from published GFF annotations, matched to the clicked protein.
+
+**Snake viewer** (2,235 proteins): three families — Pla2g2 (452, Koludarov et al. 2020), KLK serine proteases (491, Barua & Koludarov 2021 BMC Biology), 3FTx (1,292 toxin proteins, Koludarov et al. 2023 Nature Comms). Genomic context from published manual GFF annotations.
+
+**Bee viewer** (4,606 proteins): 33 protein families from the Hymenoptera venom arsenal (Koludarov et al. 2023 BMC Biology). Genomic context from 739 manually annotated GFF3 regions across 23 species.
+
+The viewers are deliberately simple — no server, no database, just data and the idea. The point is that protein space works as a navigational interface, and all metadata naturally becomes "color by" dimensions.
+
+## 6. Data Completeness Tiers
+
+Following the platinum/gold/silver/bronze concept, defined by slot coverage:
+
+| Tier | Required Slots | Example |
 |------|---------------|---------|
-| **Platinum** | embedding + sequence + taxonomy + structure + expression + proteomics + activity | Apamin (Apis mellifera) |
-| **Gold** | embedding + sequence + taxonomy + structure + venom classification | Most ToxProt entries |
+| **Platinum** | embedding + sequence + taxonomy + structure + expression + proteomics + activity | Apamin (*Apis mellifera*) |
+| **Gold** | embedding + sequence + taxonomy + structure + classification | Most ToxProt entries |
 | **Silver** | embedding + sequence + taxonomy | Computationally predicted venom proteins |
 | **Bronze** | sequence + taxonomy only | Unannotated transcriptome hits |
 
-## Storage Format: ProtSpace Bundle
+## 7. Implementation Path
 
-The prototype ships as a `.parquetbundle` — the same format already used by ProtSpace.
-This means:
+**Phase 1 — Protein records + embedding viewer.** Load existing datasets (ToxProt, our published data) as protein records with embedding, sequence, taxonomy, and classification slots. Web interface: embedding scatter with color-by and info panel. This is what the prototypes already demonstrate.
 
-1. **Immediately visualizable** — drag into ProtSpace web app, explore
-2. **Lightweight** — a few MB for thousands of proteins
-3. **Self-contained** — annotations + projections + settings in one file
-4. **Compatible** — works with existing ProtSpace infrastructure
+**Phase 2 — Genome viewer + links.** Add genome records from GFF3 annotations. Link proteins to their genomic context. Interactive gene neighborhood canvas (already prototyped in the HTML viewers).
 
-For the full database (Phase 2+), the bundle is the **export/visualization format**.
-The system-of-record can be PostgreSQL (as Todd proposes) or SQLite, with tags stored
-as JSON columns or a tag table. The bundle is generated from the database for
-exploration.
+**Phase 3 — Expression + proteomics + activity.** Add quantitative data slots. Import from published supplementary tables, VenomZone, and community submissions.
 
-## Prototype Datasets
+**Phase 4 — Community features.** User accounts, protein-level comments and annotations, evidence curation, data submission workflows.
 
-| Dataset | Proteins | Source | Tags Available |
-|---------|----------|--------|----------------|
-| Bee venom (Koludarov 2023) | 372 | BMC Biology | taxonomy, family, group, length, proteomics, transcriptomics, activity |
-| 3FTx/Ly6 (Koludarov 2023) | 1,426 | Nature Comms | taxonomy, family, group, membrane, GO, CATH, structure scores, sequences |
-| Serine proteases (Barua & Koludarov 2021) | ~500 | BMC Biology | taxonomy, family, synteny, tissue expression, genomic annotations |
-| + ToxProt reference | 8,055 | UniProtKB | taxonomy, family, function, sequence, cross-references |
+## 8. Next Steps
 
-**Total prototype: ~10,000 venom proteins** across all major venomous lineages.
+- Review the attached viewers and this data model
+- Agree on the protein record format and slot ontology
+- Define the initial scope: which species, which data types, what tier to target first
+- Discuss infrastructure: hosting, data submission pipeline, community curation model
 
-## Implementation Phases
-
-### Phase 1: Bundle Prototype (Current)
-- Merge published datasets into unified protein table
-- Generate ProtT5 embeddings for all proteins
-- Build `.parquetbundle` with tag columns
-- Ship to Todd as attachment — "here, explore this in ProtSpace"
-
-### Phase 2: VenomsBase Backend
-- PostgreSQL system-of-record (Todd's relational schema for provenance)
-- REST API serving protein records with tags
-- Bundle export endpoint (generate ProtSpace bundles on demand)
-- Visual workflow platform integration: VenomsBase as a data source module
-
-### Phase 3: Full Platform
-- Visual workflow platform frontend: genomics viewer, species selector, protein space
-- User comments/discussion per protein
-- Community curation workflows
-- Unified embedding framework integration: venom proteins as first vertical
-
-## Relationship to the Unified Embedding Framework
-
-VenomsBase is the first domain-specific implementation of a broader framework:
-
-```
-VenomsBase (venom proteins)
-    ↓ generalizes to
-Visual workflow platform (all proteins)
-    ↓ generalizes to
-Unified embedding framework (all biological data)
-    H(s) = (h_hyp, h_euc) — product manifold per species
-```
-
-The protein embedding in VenomsBase is a component of the full unified embedding.
-As the framework matures, VenomsBase proteins gain additional context: their species'
-position in taxonomy space (hyperbolic), their genomic neighborhood (synteny
-embeddings), their expression profile (transcriptomic embeddings).
-
-## Why Tags Beat Relational Joins: The Dowell Problem
-
-A concrete example of why the tag architecture matters: Dowell et al. (2016) proposed
-a venom protein family classification that is widely used but increasingly recognized
-as inaccurate — even by Dowell himself. Our studies (Koludarov et al. 2023) provide
-updated classifications, but the field still references Dowell's scheme.
-
-In a relational database, changing the family classification means:
-- Updating a `GeneFamily` table
-- Cascading changes through `FamilyMembership`, `OrthogroupMembership`
-- Rebuilding cross-references, breaking saved queries
-- Risk of inconsistency during migration
-
-In the tag architecture:
-- Update `venom.family` tag on affected proteins
-- Old value preserved in `venom.family_dowell2016` if needed for backward compatibility
-- No schema changes, no cascading joins, no downtime
-- Both classifications can coexist as parallel tag dimensions
-
-This generalizes: **any reclassification is just a tag update**. Nomenclature changes
-(which plague venom research), family reassignments, new evidence for venom status —
-all are tag operations, not schema migrations.
-
-## FAIR Compliance
-
-| Principle | Implementation |
-|-----------|---------------|
-| **Findable** | Every protein has a persistent identifier; metadata searchable via tags |
-| **Accessible** | Open-access bundles downloadable; REST API with authentication |
-| **Interoperable** | Standard formats (Parquet, FASTA, GFF); UniProt/NCBI cross-references |
-| **Reproducible** | Embedding model versions tracked; provenance tags on all derived data |
-
-## Next Steps
-
-1. **Immediate:** Build prototype bundle from 3 published datasets → ship to Todd
-2. **Short-term:** Set up GitHub repo, define tag ontology, write REST API spec
-3. **Medium-term:** Visual workflow platform module with VenomsBase backend
-4. **Long-term:** Community platform with unified embedding framework integration
+Happy to jump on a call to walk through it.
